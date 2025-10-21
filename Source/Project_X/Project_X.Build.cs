@@ -1,0 +1,48 @@
+// Copyright Epic Games, Inc. All Rights Reserved.
+
+using UnrealBuildTool;
+
+public class Project_X : ModuleRules
+{
+	public Project_X(ReadOnlyTargetRules Target) : base(Target)
+	{
+		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+
+		PublicDependencyModuleNames.AddRange(new string[] {
+			"Core",
+			"CoreUObject",
+			"Engine",
+			"InputCore",
+			"EnhancedInput",
+			"AIModule",
+			"StateTreeModule",
+			"GameplayStateTreeModule",
+			"UMG",
+			"Slate",
+			"SlateCore",
+			"Sockets",
+			"Networking",
+            "HTTP",
+			"Json",
+			"JsonUtilities",
+            "Niagara",
+			"GameplayTags"
+        });
+
+		PrivateDependencyModuleNames.AddRange(new string[] { "NavigationSystem"});
+		
+		PublicIncludePaths.AddRange(new string[] {
+			"Project_X",
+			"Project_X/Variant_Combat",
+			"Project_X/Variant_Combat/AI"
+		});
+
+		// Uncomment if you are using Slate UI
+		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
+
+		// Uncomment if you are using online features
+		// PrivateDependencyModuleNames.Add("OnlineSubsystem");
+
+		// To include OnlineSubsystemSteam, add it to the plugins section in your uproject file with the Enabled attribute set to true
+	}
+}
