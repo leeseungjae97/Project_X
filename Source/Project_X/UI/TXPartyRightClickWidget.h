@@ -7,7 +7,7 @@
 DECLARE_DYNAMIC_DELEGATE_OneParam(FKickDelegate, int64, ObjectId);
 DECLARE_DYNAMIC_DELEGATE_OneParam(FChangeLeaderDelegate, int64, ObjectId);
 
-class UTXPartySystem;
+class UPXPartySystem;
 class UButton;
 
 UCLASS()
@@ -31,7 +31,7 @@ private:
 	
 private:
 	UPROPERTY()
-	UTXPartySystem* PartySystem;
+	UPXPartySystem* PartySystem;
 
 	FKickDelegate KickDelegate;
 	FChangeLeaderDelegate ChangeLeaderDelegate;

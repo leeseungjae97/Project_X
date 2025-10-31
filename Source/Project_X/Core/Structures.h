@@ -11,18 +11,18 @@ struct FCollisionInfo
 	
 public:
 	UPROPERTY(EditAnywhere)
-	ETXCollisionShapeType ShapeType;
+	EPXCollisionShapeType ShapeType;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition ="ShapeType == ETXCollisionShapeType::Box"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition ="ShapeType == EPXCollisionShapeType::Box"))
 	FVector BoxExtent;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition ="ShapeType == ETXCollisionShapeType::Sphere"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition ="ShapeType == EPXCollisionShapeType::Sphere"))
 	float SphereRadius;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition ="ShapeType == ETXCollisionShapeType::Capsule"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition ="ShapeType == EPXCollisionShapeType::Capsule"))
 	float CapsuleHalfH;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition ="ShapeType == ETXCollisionShapeType::Capsule"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition ="ShapeType == EPXCollisionShapeType::Capsule"))
 	float CapsuleRadius;
 	
 };

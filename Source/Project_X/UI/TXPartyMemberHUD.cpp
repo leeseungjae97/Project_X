@@ -1,14 +1,14 @@
 #include "UI/TXPartyMemberHUD.h"
 
 #include "TXPartyMemberListEntryWidget.h"
-#include "GameSystem/Party/TXPartySystem.h"
+#include "GameSystem/Party/PXPartySystem.h"
 #include "Components/ListView.h"
 
 void UTXPartyMemberHUD::NativeConstruct()
 {
 	Super::NativeConstruct();
 	
-	PartySystem = GetGameInstance()->GetSubsystem<UTXPartySystem>();
+	PartySystem = GetGameInstance()->GetSubsystem<UPXPartySystem>();
 	if (PartySystem)
 	{
 		PartySystem->OnPartyDataChanged.AddDynamic(this, &UTXPartyMemberHUD::RefreshPartyMemberList);

@@ -4,7 +4,7 @@
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Components/CanvasPanelSlot.h"
 #include "UI/TXPartyListEntryWidget.h"
-#include "GameSystem/Party/TXPartySystem.h"
+#include "GameSystem/Party/PXPartySystem.h"
 #include "Components/ListView.h"
 #include "Spatial/GeometrySet3.h"
 
@@ -13,7 +13,7 @@ void UTXPartyWidget::NativeConstruct()
 	Super::NativeConstruct();
 
 	UI_PartyRightClickWidget->SetVisibility(ESlateVisibility::Hidden);
-	PartySystem = GetGameInstance()->GetSubsystem<UTXPartySystem>();
+	PartySystem = GetGameInstance()->GetSubsystem<UPXPartySystem>();
 	if (PartySystem)
 	{
 		PartySystem->OnPartyDataChanged.AddDynamic(this, &UTXPartyWidget::RefreshPartyList);

@@ -7,7 +7,7 @@
 
 class UTXEnemyIndicatorWidget;
 class AActor;
-class UTXLockOnComponent;
+class UPXLockOnComponent;
 class UMaterialInstance;
 class UMaterialInstanceDynamic;
 class UCurveFloat;
@@ -76,7 +76,7 @@ private:
 	
 
 	UPROPERTY()
-	UTXLockOnComponent* LockOnComponent;
+	UPXLockOnComponent* LockOnComponent;
 
 	UPROPERTY()
 	ADecalActor* RangeEffectDecalActor;

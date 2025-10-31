@@ -2,12 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "GameSystem/Party/TXPartyData.h"
+#include "GameSystem/Party/PXPartyData.h"
 #include "TXPartyWidget.generated.h"
 
 class UListView;
 class UTXPartyListEntryWidget;
-class UTXPartySystem;
+class UPXPartySystem;
 
 UCLASS()
 class PROJECT_X_API UTXPartyWidget : public UUserWidget
@@ -47,7 +47,7 @@ public:
 	TMap<int32, UTXPartyListEntryWidget*> ListEntryMap;
 
 	UPROPERTY()
-	UTXPartySystem* PartySystem;
+	UPXPartySystem* PartySystem;
 
 private:
 	FGeometry Geometry;

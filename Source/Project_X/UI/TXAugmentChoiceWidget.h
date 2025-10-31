@@ -6,7 +6,7 @@
 #include "Blueprint/UserWidget.h"
 #include "TXAugmentChoiceWidget.generated.h"
 class UTXAugmentCardWidget;
-struct FTXAugmentData;
+struct FPXAugmentData;
 /**
  * 
  */
@@ -30,12 +30,12 @@ private:
 	TWeakObjectPtr<AActor> OwnerActor;
 
 	// 테이블에서 랜덤 뽑기
-	bool GetRandomAugments(int32 Num, TArray<FTXAugmentData>& OutList) const;
+	bool GetRandomAugments(int32 Num, TArray<FPXAugmentData>& OutList) const;
 
 public:
 	// 1개 랜덤
-	static const FTXAugmentData* GetRandomAugmentRow(const UDataTable* Table);
+	static const FPXAugmentData* GetRandomAugmentRow(const UDataTable* Table);
 
 	// N개 랜덤 (중복X)
-	static void GetRandomAugmentRows(const UDataTable* Table, int32 Num, TArray<FTXAugmentData>& Out);
+	static void GetRandomAugmentRows(const UDataTable* Table, int32 Num, TArray<FPXAugmentData>& Out);
 };

@@ -2,14 +2,13 @@
 
 
 #include "TXPlayerController.h"
-
-#include "CombatCharacter.h"
 #include "EnhancedInputSubsystems.h"
 #include "Blueprint/UserWidget.h"
 #include "UI/TXHUDWidget.h"
 #include "UI/TXIndicatorHUDWidget.h"
 #include "UI/TXMiniMapWidget.h"
 #include "Kismet/GameplayStatics.h"
+#include "CombatCharacter.h"
 
 void ATXPlayerController::BeginPlay()
 {

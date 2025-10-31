@@ -1,7 +1,7 @@
 #include "UI/TXPartyRightClickWidget.h"
 
 #include "Components/Button.h"
-#include "GameSystem/Party/TXPartySystem.h"
+#include "GameSystem/Party/PXPartySystem.h"
 
 void UTXPartyRightClickWidget::NativeTick(const FGeometry& MyGeometry, float DeltaTime)
 {
@@ -12,7 +12,7 @@ void UTXPartyRightClickWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	PartySystem = GetGameInstance()->GetSubsystem<UTXPartySystem>();
+	PartySystem = GetGameInstance()->GetSubsystem<UPXPartySystem>();
 	KickButton->OnClicked.AddDynamic(this, &UTXPartyRightClickWidget::Kick);
 	ChangeLeaderButton->OnClicked.AddDynamic(this, &UTXPartyRightClickWidget::ChangeLeader);
 }
@@ -24,10 +24,10 @@ void UTXPartyRightClickWidget::SetObjectId(int64 InObjectId)
 		return;
 	
 	KickDelegate.Clear();
-	KickDelegate.BindDynamic(PartySystem, &UTXPartySystem::MemberRemove);
+	KickDelegate.BindDynamic(PartySystem, &UPXPartySystem::MemberRemove);
 
 	ChangeLeaderDelegate.Clear();
-	ChangeLeaderDelegate.BindDynamic(PartySystem, &UTXPartySystem::ChangePartyLeader);
+	ChangeLeaderDelegate.BindDynamic(PartySystem, &UPXPartySystem::ChangePartyLeader);
 }
 
 void UTXPartyRightClickWidget::Kick()

@@ -2,17 +2,17 @@
 
 
 #include "TXAugmentChoiceWidget.h"
-#include "GameSystem/Augments/Data/TXAugmentData.h"
+#include "GameSystem/Augments/Data/PXAugmentData.h"
 #include "TXAugmentCardWidget.h"
 #include "Algo/RandomShuffle.h"
-#include "GameSystem/Augments/TXAugmentComponent.h"
-#include "Manager/TXDataTableManager.h"
+#include "GameSystem/Augments/PXAugmentComponent.h"
+#include "Manager/PXDataTableManager.h"
 
 void UTXAugmentChoiceWidget::ShowChoices(AActor* InOwnerActor, int32 NumChoices)
 {
     OwnerActor = InOwnerActor;
 
-    TArray<FTXAugmentData> Picks;
+    TArray<FPXAugmentData> Picks;
     if (!GetRandomAugments(NumChoices, Picks)) { RemoveFromParent(); return; }
 
     // 카드 세팅 & 바인딩
@@ -34,12 +34,12 @@ void UTXAugmentChoiceWidget::ShowChoices(AActor* InOwnerActor, int32 NumChoices)
     }
 }
 
-bool UTXAugmentChoiceWidget::GetRandomAugments(int32 Num, TArray<FTXAugmentData>& OutList) const
+bool UTXAugmentChoiceWidget::GetRandomAugments(int32 Num, TArray<FPXAugmentData>& OutList) const
 {
     if (!GetWorld()) return false;
     if (UGameInstance* GI = GetWorld()->GetGameInstance())
     {
-        if (auto* TM = GI->GetSubsystem<UTXDataTableManager>())
+        if (auto* TM = GI->GetSubsystem<UPXDataTableManager>())
         {
             static const FName TableName = TEXT("AugmentTable");
             if (const UDataTable* Table = TM->GetTableByName(TableName))
@@ -53,7 +53,7 @@ bool UTXAugmentChoiceWidget::GetRandomAugments(int32 Num, TArray<FTXAugmentData>
     return false;
 }
 
-const FTXAugmentData* UTXAugmentChoiceWidget::GetRandomAugmentRow(const UDataTable* Table)
+const FPXAugmentData* UTXAugmentChoiceWidget::GetRandomAugmentRow(const UDataTable* Table)
 {
     if (!Table) return nullptr;
 
@@ -62,10 +62,10 @@ const FTXAugmentData* UTXAugmentChoiceWidget::GetRandomAugmentRow(const UDataTab
 
     // 한 번 섞고 첫 요소 선택
     Algo::RandomShuffle(RowNames);
-    return Table->FindRow<FTXAugmentData>(RowNames[0], TEXT("GetRandomAugmentRow"));
+    return Table->FindRow<FPXAugmentData>(RowNames[0], TEXT("GetRandomAugmentRow"));
 }
 
-void UTXAugmentChoiceWidget::GetRandomAugmentRows(const UDataTable* Table, int32 Num, TArray<FTXAugmentData>& Out)
+void UTXAugmentChoiceWidget::GetRandomAugmentRows(const UDataTable* Table, int32 Num, TArray<FPXAugmentData>& Out)
 {
     Out.Reset();
     if (!Table || Num <= 0) return;
@@ -80,7 +80,7 @@ void UTXAugmentChoiceWidget::GetRandomAugmentRows(const UDataTable* Table, int32
 
     for (int32 i = 0; i < Count; ++i)
     {
-        if (const FTXAugmentData* Row = Table->FindRow<FTXAugmentData>(RowNames[i], TEXT("GetRandomAugmentRows")))
+        if (const FPXAugmentData* Row = Table->FindRow<FPXAugmentData>(RowNames[i], TEXT("GetRandomAugmentRows")))
         {
             Out.Add(*Row);
         }
@@ -91,7 +91,7 @@ void UTXAugmentChoiceWidget::OnCardSelected(FName AugmentID)
 {
     if (!OwnerActor.IsValid()) { RemoveFromParent(); return; }
 
-    if (auto* AugComp = OwnerActor->FindComponentByClass<UTXAugmentComponent>())
+    if (auto* AugComp = OwnerActor->FindComponentByClass<UPXAugmentComponent>())
     {
         // 내부에서 TableManager 통해 실제 적용
         AugComp->ApplyAugmentByID(AugmentID, OwnerActor.Get(), nullptr);

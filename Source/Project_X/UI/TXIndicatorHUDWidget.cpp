@@ -3,13 +3,13 @@
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/GameViewportClient.h"
-#include "TXComponents/TXLockOnComponent.h"
+#include "PXComponents/PXLockOnComponent.h"
 #include "Components/DecalComponent.h"
 #include "Engine/DecalActor.h"
-#include "CombatCharacter.h"
 #include "Engine/Engine.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Curves/CurveVector.h"
+#include "CombatCharacter.h"
 
 void UTXIndicatorHUDWidget::NativeConstruct()
 {
@@ -25,7 +25,7 @@ void UTXIndicatorHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDelt
 
 	if (!LockOnComponent)
 	{
-		LockOnComponent = Cast<UTXLockOnComponent>(GetOwningPlayerPawn()->GetComponentByClass(UTXLockOnComponent::StaticClass()));
+		LockOnComponent = Cast<UPXLockOnComponent>(GetOwningPlayerPawn()->GetComponentByClass(UPXLockOnComponent::StaticClass()));
 		SpawnRangeEffectDecal();
 	}
 	

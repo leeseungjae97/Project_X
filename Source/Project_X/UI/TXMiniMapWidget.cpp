@@ -3,18 +3,14 @@
 
 #include "UI/TXMiniMapWidget.h"
 #include "GameFramework/PlayerController.h"
-#include "TXComponents/TXMiniMapComponent.h"
-#include "TXComponents/TXLockOnComponent.h"
+#include "PXComponents/PXMiniMapComponent.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/Texture2D.h"
 #include "UI/TXEnemyMarkerWidget.h"
 #include "Components/Image.h"
 #include "Components/CanvasPanel.h"
-#include "Components/Overlay.h"
-#include "Components/OverlaySlot.h"
-#include "CombatCharacter.h"
-#include "Blueprint/WidgetLayoutLibrary.h"
+#include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMaterialLibrary.h"
 
@@ -62,7 +58,7 @@ void UTXMiniMapWidget::SetMiniMapImage()
 	if (!PlayerPawn) return;
 
 	if (!MiniMapComponent)
-		MiniMapComponent = PlayerPawn->FindComponentByClass<UTXMiniMapComponent>();
+		MiniMapComponent = PlayerPawn->FindComponentByClass<UPXMiniMapComponent>();
 
 	if (!MiniMapComponent || !MiniMapComponent->SceneCaptureComponent)
 		return;

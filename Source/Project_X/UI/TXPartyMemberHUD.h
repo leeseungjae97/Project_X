@@ -2,11 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "GameSystem/Party/TXPartyData.h"
+#include "GameSystem/Party/PXPartyData.h"
 #include "TXPartyMemberHUD.generated.h"
 
 class UListView;
-class UTXPartySystem;
+class UPXPartySystem;
 
 UCLASS()
 class PROJECT_X_API UTXPartyMemberHUD : public UUserWidget
@@ -32,6 +32,6 @@ public:
 	UListView* PartyMemberList;
 	
 	UPROPERTY()
-	UTXPartySystem* PartySystem;
+	UPXPartySystem* PartySystem;
 
 };

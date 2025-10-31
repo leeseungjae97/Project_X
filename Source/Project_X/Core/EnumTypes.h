@@ -42,7 +42,7 @@ enum class EAttackType : uint8
 };
 
 UENUM(BlueprintType)
-enum class ETXCollisionShapeType : uint8
+enum class EPXCollisionShapeType : uint8
 {
 	Box,
 	Sphere,

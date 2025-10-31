@@ -32,9 +32,7 @@ public class Project_X : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[] { "NavigationSystem"});
 		
 		PublicIncludePaths.AddRange(new string[] {
-			"Project_X",
-			"Project_X/Variant_Combat",
-			"Project_X/Variant_Combat/AI"
+			"Project_X"
 		});
 
 		// Uncomment if you are using Slate UI

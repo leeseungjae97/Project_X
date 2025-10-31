@@ -12,8 +12,8 @@ class UOverlay;
 class APlayerController;
 class UTextureRenderTarget2D;
 class UTXEnemyMarkerWidget;
-class UTXLockOnComponent;
-class UTXMiniMapComponent;
+class UPXLockOnComponent;
+class UPXMiniMapComponent;
 class UMaterialParameterCollection;
 
 UCLASS()
@@ -53,7 +53,7 @@ private:
 private:
 
 	UPROPERTY()
-	UTXMiniMapComponent* MiniMapComponent;
+	UPXMiniMapComponent* MiniMapComponent;
 
 	FVector CameraLoc;
 	float WorldUnitsPerPixel;

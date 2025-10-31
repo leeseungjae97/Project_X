@@ -6,7 +6,7 @@
 #include "Blueprint/UserWidget.h"
 #include "TXAugmentCardWidget.generated.h"
 
-struct FTXAugmentData;
+struct FPXAugmentData;
 class UTextBlock;
 class UButton;
 class UImage;
@@ -20,7 +20,7 @@ class PROJECT_X_API UTXAugmentCardWidget : public UUserWidget
 
 public:
 	UFUNCTION(BlueprintCallable)
-	void SetupFromData(const FTXAugmentData& InData);
+	void SetupFromData(const FPXAugmentData& InData);
 
 	UPROPERTY(meta=(BindWidget)) UTextBlock* Text_Name;
 	UPROPERTY(meta=(BindWidget)) UTextBlock* Text_Desc;
