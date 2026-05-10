@@ -23,9 +23,24 @@ void UTXIndicatorHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDelt
 	if(RangeEffectTimeline.IsPlaying())
 		RangeEffectTimeline.TickTimeline(InDeltaTime);
 
+	APawn* OwningPawn = GetOwningPlayerPawn();
+	if (!OwningPawn)
+	{
+		for (const TPair<AActor*, UTXEnemyIndicatorWidget*>& Pair : ActiveIndicatorsMap)
+		{
+			if (Pair.Value)
+			{
+				Pair.Value->RemoveFromParent();
+			}
+		}
+		ActiveIndicatorsMap.Empty();
+		LockOnComponent = nullptr;
+		return;
+	}
+
 	if (!LockOnComponent)
 	{
-		LockOnComponent = Cast<UPXLockOnComponent>(GetOwningPlayerPawn()->GetComponentByClass(UPXLockOnComponent::StaticClass()));
+		LockOnComponent = Cast<UPXLockOnComponent>(OwningPawn->GetComponentByClass(UPXLockOnComponent::StaticClass()));
 		SpawnRangeEffectDecal();
 	}
 	
@@ -53,7 +68,7 @@ void UTXIndicatorHUDWidget::SpawnIndicator()
 	{
 		const TPair<AActor*, float>& ActorPair = DetectedActorsArray[i];
 		AActor* TargetActor = ActorPair.Key;
-		if (!TargetActor || !TargetActor->IsValidLowLevelFast())
+		if (!IsValid(TargetActor))
 		{
 			continue;
 		}
@@ -113,25 +128,26 @@ void UTXIndicatorHUDWidget::SpawnIndicator()
 		AActor* Actor = Pair.Key;
 		UTXEnemyIndicatorWidget* IndicatorWidget = Pair.Value;
 
-		if (!ActorsToUpdateThisFrame.Contains(Actor))
+		if (!IsValid(Actor) || !ActorsToUpdateThisFrame.Contains(Actor))
 		{
 			if (IndicatorWidget)
 			{
 				IndicatorWidget->RemoveFromParent();
 			}
+			ActorsToRemove.Add(Actor);
 		}
 	}
 
-	//for (AActor* Actor : ActorsToRemove)
-	//{
-	//	ActiveIndicatorsMap.Remove(Actor);
-	//}
+	for (AActor* Actor : ActorsToRemove)
+	{
+		ActiveIndicatorsMap.Remove(Actor);
+	}
 }
 
 bool UTXIndicatorHUDWidget::CalculateIndicatorPositionAndRotation(AActor* TargetActor, FVector2D& OutScreenPosition, float& OutRotationAngle)
 {
 	APlayerController* PlayerController = GetOwningPlayer();
-	if (!PlayerController || !TargetActor)
+	if (!PlayerController || !IsValid(TargetActor))
 	{
 		return false;
 	}
@@ -211,16 +227,21 @@ void UTXIndicatorHUDWidget::SpawnRangeEffectDecal()
 	}
 
 	UWorld* World = GetWorld();
+	APlayerController* OwningPlayer = GetOwningPlayer();
+	if (!World || !OwningPlayer || !OwningPlayer->GetPawn())
+	{
+		return;
+	}
 
 	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = GetOwningPlayer();
+	SpawnParams.Owner = OwningPlayer;
 	//SpawnParams.Instigator = GetInstigator();
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 	ACombatCharacter* Owner = nullptr;
 
-	if(GetOwningPlayer()->GetPawn())
-		Owner = Cast<ACombatCharacter>(GetOwningPlayer()->GetPawn());
+	if(OwningPlayer->GetPawn())
+		Owner = Cast<ACombatCharacter>(OwningPlayer->GetPawn());
 
 	if (!Owner)
 		return;

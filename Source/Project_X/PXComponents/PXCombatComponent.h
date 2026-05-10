@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Core/EnumTypes.h"
 #include "PXWeapons/PXWeapon.h"
 #include "PXCombatComponent.generated.h"
 
@@ -32,6 +33,8 @@ private:
 	// 스태미너 회복 함수
 	void RecoverStamina();
 	void ConsumeStaminaWhileRunning(float DeltaTime);
+	void ResetHitReactionPhysics();
+	void RestoreOwnerMovementIfNeeded();
 public:
 	void ResetStat();
 	void ResetHP();
@@ -47,10 +50,15 @@ public:
 	void UpdateStaminaBar() const;
 
 	void EquipWeapon(APXWeapon* Weapon);
+	void UnequipWeapon();
 	void WeaponAttack();
 	void Fire();
 
 	EWeaponType GetWeaponType();
+	bool CanAttack() const;
+	void MarkAttackUsed();
+	float GetAttackCooldown() const;
+	void ApplyStatModifier(EPXPlayerStatType StatType, float AddValue, float MultiplyValue = 1.0f);
 
 public:
 	FORCEINLINE float GetMaxHP() { return MaxHP; }
@@ -63,6 +71,7 @@ public:
 	FORCEINLINE float GetMeleeKnockbackImpulse() { return MeleeKnockbackImpulse; }
 	FORCEINLINE float GetMeleeLaunchImpulse() { return MeleeLaunchImpulse; }
 	FORCEINLINE float GetMaxWalkSpeed() { return MaxWalkSpeed; }
+	FORCEINLINE float GetAttackSpeed() { return AttackSpeed; }
 	FORCEINLINE bool IsAttacking() { return bIsAttacking; }
 	FORCEINLINE bool IsInventoryOpen() { return bIsInventoryOpen; }
 	FORCEINLINE bool IsRunning() { return bIsRunning; }
@@ -79,6 +88,7 @@ public:
 	FORCEINLINE void SetMeleeKnockbackImpulse(float InMeleeKnockbackImpulse) { MeleeKnockbackImpulse = InMeleeKnockbackImpulse; }
 	FORCEINLINE void SetMeleeLaunchImpulse(float InMeleeLaunchImpulse) { MeleeLaunchImpulse = InMeleeLaunchImpulse; }
 	FORCEINLINE void SetMaxWalkSpeed(float InMaxWalkSpeed) { MaxWalkSpeed = InMaxWalkSpeed; }
+	FORCEINLINE void SetAttackSpeed(float InAttackSpeed) { AttackSpeed = FMath::Max(0.1f, InAttackSpeed); }
 	FORCEINLINE void SetIsInventoryOpen(bool InbIsInventoryOpen) { bIsInventoryOpen = InbIsInventoryOpen; }
 	FORCEINLINE void SetIsRunning(bool InbIsRunning) { bIsRunning = InbIsRunning; }
 	FORCEINLINE void SetIsDodging(bool InbIsDashing) { bIsDodging = InbIsDashing; }
@@ -165,6 +175,14 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Movement|WalkSpeed", meta = (ClampMin = 0, ClampMax = 1000, Units = "cm/s"))
 	float MaxWalkSpeed;
 
+	UPROPERTY(EditAnywhere, Category = "Melee Attack", meta = (ClampMin = 0.1, ClampMax = 10))
+	float AttackSpeed = 1.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Regeneration", meta = (ClampMin = 0))
+	float HealthRecoveryAmount = 0.0f;
+
+	float LastAttackTime = -1000.0f;
+
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> HUDWidgetClass;
 	
@@ -177,6 +195,13 @@ private:
 	bool bIsRecoveringStamina = false;
 	
 	FTimerHandle StaminaRecoveryTimer;
+	FTimerHandle HitReactionPhysicsTimer;
+
+	UPROPERTY(EditAnywhere, Category = "Damage|Hit Reaction", meta = (ClampMin = 0, ClampMax = 1))
+	float HitReactionPhysicsBlendWeight = 0.35f;
+
+	UPROPERTY(EditAnywhere, Category = "Damage|Hit Reaction", meta = (ClampMin = 0))
+	float HitReactionPhysicsDuration = 0.18f;
 
 	// Weapon
 	bool bIsWeaponEquipped = false;

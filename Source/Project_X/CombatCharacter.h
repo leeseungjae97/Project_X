@@ -9,6 +9,7 @@
 #include "PXWeapons/PXWeapon.h"
 #include "PXWeapons/PXMeleeWeapon.h"
 #include "PXWeapons/PXHitscanWeapon.h"
+#include "AbilitySystemInterface.h"
 #include "CombatCharacter.generated.h"
 
 class USpringArmComponent;
@@ -22,6 +23,10 @@ class UPXPlayerAnimInstance;
 class UPXLockOnComponent;
 class UTXLockOnWidget;
 class UPXMiniMapComponent;
+class UGameplayAbility;
+class UGameplayEffect;
+class UAbilitySystemComponent;
+class UPXHealthSet;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogCombatCharacter, Log, All);
 
@@ -34,7 +39,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogCombatCharacter, Log, All);
  *  - Respawning
  */
 UCLASS(abstract)
-class PROJECT_X_API ACombatCharacter : public ACharacter, public ICombatAttacker, public IDamageable
+class PROJECT_X_API ACombatCharacter : public ACharacter, public ICombatAttacker, public IDamageable, public IAbilitySystemInterface
 {
 	GENERATED_BODY()
 
@@ -45,7 +50,7 @@ class PROJECT_X_API ACombatCharacter : public ACharacter, public ICombatAttacker
 	/** Follow camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FollowCamera;
-
+	
 	/** Life bar widget component */
 	//UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = UI, meta = (AllowPrivateAccess = "true"))
 	//UWidgetComponent* LifeBar;
@@ -62,6 +67,25 @@ class PROJECT_X_API ACombatCharacter : public ACharacter, public ICombatAttacker
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = MiniMap, meta = (AllowPrivateAccess = "true"))
 	UPXMiniMapComponent* TXMiniMapComponent;
 
+public:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = GAS, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = GAS, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPXHealthSet> HealthSet;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = GAS, meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UGameplayAbility> PrimaryAbility;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = GAS, meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UGameplayAbility> SecondaryAbility;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = GAS, meta = (AllowPrivateAccess = "true"))
+	TArray<TSubclassOf<UGameplayEffect>> DefaultEffects;
+
+public:
+	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+	
 private:
 	UPROPERTY()
 	FString PlayerName;
@@ -412,6 +436,7 @@ public:
 	
 public:
 	void SpawnWeapon(TSubclassOf<APXWeapon> SpawnWeaponClass);
+	void UnequipWeapon();
 	// void SwapWeapon();
 	
 	//void EquipWeapon(EWeaponType WeaponType);
@@ -430,4 +455,10 @@ public:
 	void WeaponAttack();
 	void FireWeapon();
 	void PlayWeaponMontage();
+
+private:
+	void ApplyWeaponAttackDamageFallback();
+
+	bool bWeaponDamageAppliedThisAttack = false;
+	FTimerHandle WeaponDamageFallbackTimer;
 };

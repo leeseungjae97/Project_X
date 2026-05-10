@@ -30,6 +30,15 @@ public:
 	UPROPERTY(EditAnywhere)
 	UNiagaraSystem* MuzzleFlash;
 
+	UPROPERTY(EditAnywhere, Category = "Weapon|Damage", meta = (ClampMin = 0))
+	float Damage = 1.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Weapon|Damage", meta = (ClampMin = 0))
+	float KnockbackImpulse = 250.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Weapon|Damage", meta = (ClampMin = 0))
+	float LaunchImpulse = 150.0f;
+
 private:
 	void TraceHitTarget(FHitResult& HitResult);
 };

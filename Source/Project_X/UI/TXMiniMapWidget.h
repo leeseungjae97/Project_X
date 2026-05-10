@@ -15,6 +15,7 @@ class UTXEnemyMarkerWidget;
 class UPXLockOnComponent;
 class UPXMiniMapComponent;
 class UMaterialParameterCollection;
+class UOverlay;
 
 UCLASS()
 class PROJECT_X_API UTXMiniMapWidget : public UUserWidget
@@ -28,6 +29,9 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent)
 	void AddMapPoint(AActor* Actor);
+
+	UFUNCTION(BlueprintNativeEvent)
+	void RemoveMapPoint(AActor* Actor);
 
 private:
 	void SetMiniMapImage();
@@ -49,6 +53,7 @@ public:
 
 private:
 	void SetMiniMapImage(UTextureRenderTarget2D* RenderTarget);
+	UOverlay* FindMapPointsOverlay() const;
 
 private:
 

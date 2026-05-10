@@ -9,7 +9,11 @@ class UInputMappingContext;
 class UTXHUDWidget;
 class UTXIndicatorHUDWidget;
 class UTXMiniMapWidget;
+class UTXAugmentChoiceWidget;
 class ACombatCharacter;
+class ACombatEnemy;
+class APXRoundManager;
+class APXWaveSurvivalGameMode;
 /**
  * 
  */
@@ -49,8 +53,23 @@ protected:
 	UPROPERTY()
 	UTXMiniMapWidget* MiniMapWidget;
 
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> AugmentChoiceWidgetClass;
+
+	UPROPERTY()
+	UTXAugmentChoiceWidget* AugmentChoiceWidget;
+
+	UPROPERTY()
+	APXRoundManager* BoundRoundManager;
+
+	UPROPERTY()
+	ACombatEnemy* ActiveBossEnemy;
+
+	FTimerHandle ResultTextClearTimer;
+
 protected:
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
 	
 	/** Initialize input bindings */
 	virtual void SetupInputComponent() override;
@@ -77,6 +96,29 @@ protected:
 
 private:
 	void AddHUDWidget();
+	void BindRoundManager();
+	void BindGameMode();
+	void EnsureAugmentChoiceWidgetVisible();
+	void ClearTransientResultText();
+	void UpdateBossHealthBar();
+
+	UFUNCTION()
+	void HandleRoundStarted(int32 RoundIndex, int32 TotalEnemies);
+
+	UFUNCTION()
+	void HandleRoundProgressChanged(int32 RoundIndex, int32 RemainingEnemies, int32 AliveEnemies);
+
+	UFUNCTION()
+	void HandleAugmentChoiceRequested(int32 CompletedRoundIndex);
+
+	UFUNCTION()
+	void HandleBossSpawned(ACombatEnemy* BossEnemy);
+
+	UFUNCTION()
+	void HandleVictory();
+
+	UFUNCTION()
+	void HandleDefeat();
 
 public:
 	UTXIndicatorHUDWidget* GetIndicatorHUDWidget() { return IndicatorHUDWidget; }

@@ -29,7 +29,13 @@ public class Project_X : ModuleRules
 			"GameplayTags"
         });
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "NavigationSystem"});
+		PrivateDependencyModuleNames.AddRange(new string[]
+		{
+			"NavigationSystem",
+			"GameplayAbilities",
+			"GameplayTasks",
+			"GameplayTags"
+		});
 		
 		PublicIncludePaths.AddRange(new string[] {
 			"Project_X"

@@ -2,6 +2,7 @@
 
 
 #include "CombatEnemy.h"
+#include "AIController.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "CombatAIController.h"
@@ -12,6 +13,11 @@
 #include "Animation/AnimInstance.h"
 #include "PXComponents/PXMapPointComponent.h"
 #include "PXCombatLifeBar.h"
+#include "Kismet/GameplayStatics.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
+#include "PXEnemyProjectile.h"
+#include "UObject/ConstructorHelpers.h"
 
 ACombatEnemy::ACombatEnemy()
 {
@@ -36,14 +42,28 @@ ACombatEnemy::ACombatEnemy()
 
 	MapPointComponent = CreateDefaultSubobject<UPXMapPointComponent>(TEXT("TX Map Point Component"));
 
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> EnemyMaterialFinder(TEXT("/Game/Materials/M_EnemyTypeColor.M_EnemyTypeColor"));
+	if (EnemyMaterialFinder.Succeeded())
+	{
+		EnemyTypeMaterial = EnemyMaterialFinder.Object;
+	}
+
 	// set the collision capsule size
 	GetCapsuleComponent()->SetCapsuleSize(35.0f, 90.0f);
 
 	// set the character movement properties
 	GetCharacterMovement()->bUseControllerDesiredRotation = true;
+	GetCharacterMovement()->MaxWalkSpeed = EnemyStats.MoveSpeed;
 
 	// reset HP to maximum
 	CurrentHP = MaxHP;
+}
+
+void ACombatEnemy::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	UpdatePrototypeChase(DeltaSeconds);
 }
 
 void ACombatEnemy::DoAIComboAttack()
@@ -54,11 +74,18 @@ void ACombatEnemy::DoAIComboAttack()
 		return;
 	}
 
+	if (!ComboAttackMontage || ComboSectionNames.IsEmpty())
+	{
+		OnAttackCompleted.ExecuteIfBound();
+		return;
+	}
+
 	// raise the attacking flag
 	bIsAttacking = true;
+	bDamageAppliedThisAttack = false;
 
 	// choose how many times we're going to attack
-	TargetComboCount = FMath::RandRange(1, ComboSectionNames.Num() - 1);
+	TargetComboCount = FMath::RandRange(1, ComboSectionNames.Num());
 
 	// reset the attack counter
 	CurrentComboAttack = 0;
@@ -73,7 +100,20 @@ void ACombatEnemy::DoAIComboAttack()
 		{
 			// set the end delegate for the montage
 			AnimInstance->Montage_SetEndDelegate(OnAttackMontageEnded, ComboAttackMontage);
+
+			const float DamageDelay = FMath::Max(0.0f, MontageLength * PrototypeAttackDamageTime);
+			GetWorldTimerManager().SetTimer(PrototypeAttackDamageTimer, this, &ACombatEnemy::ApplyPrototypeAttackDamage, DamageDelay, false);
 		}
+		else
+		{
+			bIsAttacking = false;
+			OnAttackCompleted.ExecuteIfBound();
+		}
+	}
+	else
+	{
+		bIsAttacking = false;
+		OnAttackCompleted.ExecuteIfBound();
 	}
 }
 
@@ -81,6 +121,11 @@ void ACombatEnemy::DoAIChargedAttack()
 {
 	// ignore if we're already playing an attack animation
 	if (bIsAttacking)
+	{
+		return;
+	}
+
+	if (!ChargedAttackMontage)
 	{
 		return;
 	}
@@ -110,6 +155,8 @@ void ACombatEnemy::DoAIChargedAttack()
 
 void ACombatEnemy::AttackMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
+	GetWorldTimerManager().ClearTimer(PrototypeAttackDamageTimer);
+
 	// reset the attacking flag
 	bIsAttacking = false;
 
@@ -119,6 +166,14 @@ void ACombatEnemy::AttackMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 
 void ACombatEnemy::DoAttackTrace(FName DamageSourceBone)
 {
+	if (IsRangedEnemy())
+	{
+		FireProjectileAtTarget(GetTargetPlayerCharacter());
+		return;
+	}
+
+	bDamageAppliedThisAttack = true;
+
 	// sweep for objects in front of the character to be hit by the attack
 	TArray<FHitResult> OutHits;
 
@@ -193,7 +248,7 @@ void ACombatEnemy::CheckChargedAttack()
 
 void ACombatEnemy::ApplyDamage(float Damage, AActor* DamageCauser, const FVector& DamageLocation, const FVector& DamageImpulse)
 {
-	
+
 	// pass the damage event to the actor
 	FDamageEvent DamageEvent;
 	const float ActualDamage = TakeDamage(Damage, DamageEvent, nullptr, DamageCauser);
@@ -225,8 +280,18 @@ void ACombatEnemy::ApplyDamage(float Damage, AActor* DamageCauser, const FVector
 
 void ACombatEnemy::HandleDeath()
 {
+	if (CurrentHP <= 0.0f)
+	{
+		CurrentHP = 0.0f;
+	}
+
 	// hide the life bar
 	LifeBar->SetHiddenInGame(true);
+
+	if (MapPointComponent)
+	{
+		MapPointComponent->RemoveMapPoint();
+	}
 
 	// disable the collision capsule to avoid being hit again while dead
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -241,12 +306,269 @@ void ACombatEnemy::HandleDeath()
 	OnEnemyDied.Broadcast();
 
 	// set up the death timer
-	GetWorld()->GetTimerManager().SetTimer(DeathTimer, this, &ACombatEnemy::RemoveFromLevel, DeathRemovalTime);
+	GetWorld()->GetTimerManager().SetTimer(DeathTimer, this, &ACombatEnemy::RemoveFromLevel, FMath::Min(DeathRemovalTime, 0.25f), false);
 }
 
 void ACombatEnemy::ApplyHealing(float Healing, AActor* Healer)
 {
 	// stub
+}
+
+void ACombatEnemy::ApplyEnemyStats()
+{
+	float HealthMultiplier = 1.0f;
+	float SpeedMultiplier = 1.0f;
+	float DamageMultiplier = 1.0f;
+	float RangeMultiplier = 1.0f;
+	float RadiusMultiplier = 1.0f;
+
+	switch (GetEffectiveEnemyType())
+	{
+	case EPXEnemyType::Fast:
+		HealthMultiplier = 0.7f;
+		SpeedMultiplier = 1.45f;
+		DamageMultiplier = 0.85f;
+		RangeMultiplier = 0.9f;
+		PrototypeAttackCooldown = 0.75f;
+		break;
+	case EPXEnemyType::Tank:
+		HealthMultiplier = 3.5f;
+		SpeedMultiplier = 0.65f;
+		DamageMultiplier = 1.7f;
+		RangeMultiplier = 1.25f;
+		RadiusMultiplier = 1.35f;
+		PrototypeAttackCooldown = 1.35f;
+		break;
+	case EPXEnemyType::Ranged:
+		HealthMultiplier = 1.0f;
+		SpeedMultiplier = 0.8f;
+		DamageMultiplier = 1.0f;
+		PrototypeAttackCooldown = 1.6f;
+		RangedAttackDistance = FMath::Max(RangedAttackDistance, 900.0f);
+		break;
+	case EPXEnemyType::Boss:
+		HealthMultiplier = 12.0f;
+		SpeedMultiplier = 0.75f;
+		DamageMultiplier = 2.5f;
+		RangeMultiplier = 1.6f;
+		RadiusMultiplier = 1.8f;
+		PrototypeAttackCooldown = 1.2f;
+		break;
+	case EPXEnemyType::Normal:
+	default:
+		break;
+	}
+
+	MaxHP = FMath::Max(1.0f, EnemyStats.MaxHealth * HealthMultiplier);
+	CurrentHP = MaxHP;
+	MeleeDamage = FMath::Max(0.0f, EnemyStats.AttackDamage * DamageMultiplier);
+	MeleeTraceDistance = FMath::Max(0.0f, EnemyStats.AttackRange * RangeMultiplier);
+	MeleeTraceRadius = FMath::Max(0.0f, EnemyStats.AttackRadius * RadiusMultiplier);
+
+	if (GetCharacterMovement())
+	{
+		GetCharacterMovement()->MaxWalkSpeed = FMath::Max(0.0f, EnemyStats.MoveSpeed * SpeedMultiplier);
+	}
+}
+
+void ACombatEnemy::ApplyEnemyTypeVisuals()
+{
+	if (!bApplyTypeColor)
+	{
+		return;
+	}
+
+	const FLinearColor TypeColor = GetEnemyTypeColor();
+	USkeletalMeshComponent* EnemyMesh = GetMesh();
+	if (!EnemyMesh)
+	{
+		return;
+	}
+
+	const int32 MaterialCount = FMath::Max(1, EnemyMesh->GetNumMaterials());
+	for (int32 MaterialIndex = 0; MaterialIndex < MaterialCount; ++MaterialIndex)
+	{
+		UMaterialInterface* BaseMaterial = EnemyTypeMaterial ? EnemyTypeMaterial : EnemyMesh->GetMaterial(MaterialIndex);
+		if (!BaseMaterial)
+		{
+			continue;
+		}
+
+		if (UMaterialInstanceDynamic* DynamicMaterial = UMaterialInstanceDynamic::Create(BaseMaterial, this))
+		{
+			DynamicMaterial->SetVectorParameterValue(TEXT("Color"), TypeColor);
+			DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), TypeColor);
+			DynamicMaterial->SetVectorParameterValue(TEXT("Tint"), TypeColor);
+			DynamicMaterial->SetVectorParameterValue(TEXT("BodyColor"), TypeColor);
+			EnemyMesh->SetMaterial(MaterialIndex, DynamicMaterial);
+		}
+	}
+}
+
+void ACombatEnemy::UpdatePrototypeChase(float DeltaSeconds)
+{
+	if (!bEnablePrototypeChaseFallback || !HasAuthority() || CurrentHP <= 0.0f || bIsAttacking)
+	{
+		return;
+	}
+
+	AAIController* AIController = Cast<AAIController>(GetController());
+	ACharacter* TargetCharacter = GetTargetPlayerCharacter();
+	if (!AIController || !TargetCharacter)
+	{
+		return;
+	}
+
+	const FVector ToTarget = TargetCharacter->GetActorLocation() - GetActorLocation();
+	const float DistanceToTarget = FVector::Dist2D(GetActorLocation(), TargetCharacter->GetActorLocation());
+	const float AttackDistance = GetPrototypeAttackDistance();
+	if (DistanceToTarget <= AttackDistance)
+	{
+		AIController->StopMovement();
+		AIController->SetFocus(TargetCharacter);
+		TryPrototypeAttack(TargetCharacter);
+		return;
+	}
+
+	const FVector MoveDirection = FVector(ToTarget.X, ToTarget.Y, 0.0f).GetSafeNormal();
+	if (!MoveDirection.IsNearlyZero())
+	{
+		AddMovementInput(MoveDirection, 1.0f);
+		SetActorRotation(MoveDirection.Rotation());
+	}
+
+	ChaseUpdateElapsed += DeltaSeconds;
+	if (ChaseUpdateElapsed < ChaseUpdateInterval)
+	{
+		return;
+	}
+	ChaseUpdateElapsed = 0.0f;
+
+	AIController->SetFocus(TargetCharacter);
+	AIController->MoveToActor(TargetCharacter, AttackDistance, true, true, true);
+}
+
+void ACombatEnemy::TryPrototypeAttack(ACharacter* TargetCharacter)
+{
+	if (!TargetCharacter || CurrentHP <= 0.0f)
+	{
+		return;
+	}
+
+	const float CurrentTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	if (CurrentTime - LastPrototypeAttackTime < PrototypeAttackCooldown)
+	{
+		return;
+	}
+	LastPrototypeAttackTime = CurrentTime;
+
+	DoAIComboAttack();
+}
+
+void ACombatEnemy::ApplyPrototypeAttackDamage()
+{
+	if (CurrentHP <= 0.0f || bDamageAppliedThisAttack)
+	{
+		return;
+	}
+
+	if (IsRangedEnemy())
+	{
+		FireProjectileAtTarget(GetTargetPlayerCharacter());
+		return;
+	}
+
+	DoAttackTrace(PrototypeAttackDamageBone);
+}
+
+void ACombatEnemy::FireProjectileAtTarget(ACharacter* TargetCharacter)
+{
+	if (!TargetCharacter || !GetWorld() || bDamageAppliedThisAttack)
+	{
+		return;
+	}
+
+	bDamageAppliedThisAttack = true;
+
+	const FVector SpawnLocation = GetActorLocation() + (GetActorForwardVector() * ProjectileSpawnForwardOffset) + (FVector::UpVector * ProjectileSpawnUpOffset);
+	const FVector TargetLocation = TargetCharacter->GetActorLocation() + FVector(0.0f, 0.0f, 55.0f);
+	const FVector FireDirection = (TargetLocation - SpawnLocation).GetSafeNormal();
+	if (FireDirection.IsNearlyZero())
+	{
+		return;
+	}
+
+	UClass* ProjectileToSpawn = ProjectileClass ? ProjectileClass.Get() : APXEnemyProjectile::StaticClass();
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = this;
+	SpawnParameters.Instigator = this;
+
+	if (APXEnemyProjectile* Projectile = GetWorld()->SpawnActor<APXEnemyProjectile>(ProjectileToSpawn, SpawnLocation, FireDirection.Rotation(), SpawnParameters))
+	{
+		Projectile->InitializeProjectile(this, MeleeDamage, MeleeKnockbackImpulse, MeleeLaunchImpulse);
+	}
+}
+
+ACharacter* ACombatEnemy::GetTargetPlayerCharacter() const
+{
+	ACharacter* PlayerCharacter = UGameplayStatics::GetPlayerCharacter(this, 0);
+	if (PlayerCharacter && PlayerCharacter->Tags.Contains(FName("Player")))
+	{
+		return PlayerCharacter;
+	}
+
+	return PlayerCharacter;
+}
+
+EPXEnemyType ACombatEnemy::GetEffectiveEnemyType() const
+{
+	const FString ClassName = GetClass() ? GetClass()->GetName() : FString();
+	if (ClassName.Contains(TEXT("Boss")))
+	{
+		return EPXEnemyType::Boss;
+	}
+	if (ClassName.Contains(TEXT("Range")) || ClassName.Contains(TEXT("Ranged")))
+	{
+		return EPXEnemyType::Ranged;
+	}
+	if (ClassName.Contains(TEXT("Tank")))
+	{
+		return EPXEnemyType::Tank;
+	}
+	if (ClassName.Contains(TEXT("Fast")))
+	{
+		return EPXEnemyType::Fast;
+	}
+
+	return EnemyStats.Type;
+}
+
+FLinearColor ACombatEnemy::GetEnemyTypeColor() const
+{
+	switch (GetEffectiveEnemyType())
+	{
+	case EPXEnemyType::Fast:
+		return FLinearColor(0.1f, 0.65f, 1.0f, 1.0f);
+	case EPXEnemyType::Tank:
+		return FLinearColor(1.0f, 0.35f, 0.05f, 1.0f);
+	case EPXEnemyType::Ranged:
+		return FLinearColor(0.65f, 0.25f, 1.0f, 1.0f);
+	case EPXEnemyType::Boss:
+		return FLinearColor(1.0f, 0.05f, 0.1f, 1.0f);
+	case EPXEnemyType::Normal:
+	default:
+		return FLinearColor(0.15f, 1.0f, 0.25f, 1.0f);
+	}
+}
+
+bool ACombatEnemy::IsRangedEnemy() const
+{
+	return GetEffectiveEnemyType() == EPXEnemyType::Ranged;
+}
+
+float ACombatEnemy::GetPrototypeAttackDistance() const
+{
+	return IsRangedEnemy() ? RangedAttackDistance : MeleeTraceDistance + AttackAcceptancePadding;
 }
 
 void ACombatEnemy::RemoveFromLevel()
@@ -303,8 +625,8 @@ void ACombatEnemy::Landed(const FHitResult& Hit)
 
 void ACombatEnemy::BeginPlay()
 {
-	// reset HP to maximum
-	CurrentHP = MaxHP;
+	ApplyEnemyStats();
+	ApplyEnemyTypeVisuals();
 
 	// we top the HP before BeginPlay so StateTree picks it up at the right value
 	Super::BeginPlay();
@@ -328,11 +650,22 @@ void ACombatEnemy::EndPlay(EEndPlayReason::Type EndPlayReason)
 
 	// clear the death timer
 	GetWorld()->GetTimerManager().ClearTimer(DeathTimer);
+	GetWorld()->GetTimerManager().ClearTimer(PrototypeAttackDamageTimer);
 }
 
 void ACombatEnemy::LifeBarExposure(bool bExpose)
 {
 	LifeBar->SetHiddenInGame(!bExpose);
+}
+
+float ACombatEnemy::GetHealthPercent() const
+{
+	return MaxHP > 0.0f ? FMath::Clamp(CurrentHP / MaxHP, 0.0f, 1.0f) : 0.0f;
+}
+
+bool ACombatEnemy::IsBossEnemy() const
+{
+	return GetEffectiveEnemyType() == EPXEnemyType::Boss;
 }
 
 FVector ACombatEnemy::GetLockOnSocketLocation_Implementation() const

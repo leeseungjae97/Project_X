@@ -2,9 +2,11 @@
 #include "Player/Controller/TXPlayerController.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMeshSocket.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "PXWeapons/PXWeapon.h"
 #include "PXWeapons/PXHitscanWeapon.h"
 #include "CombatCharacter.h"
+#include "TimerManager.h"
 
 UPXCombatComponent::UPXCombatComponent(): LifeBarColor(), MaxWalkSpeed(0)
 {
@@ -23,6 +25,12 @@ void UPXCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 	ConsumeStaminaWhileRunning(DeltaTime);
+
+	if (HealthRecoveryAmount > 0.0f && CurrentHP > 0.0f && CurrentHP < MaxHP)
+	{
+		CurrentHP = FMath::Min(MaxHP, CurrentHP + HealthRecoveryAmount * DeltaTime);
+		UpdateHPBar();
+	}
 }
 
 void UPXCombatComponent::RecoverStamina()
@@ -142,6 +150,18 @@ void UPXCombatComponent::EquipWeapon(APXWeapon* Weapon)
 	}
 }
 
+void UPXCombatComponent::UnequipWeapon()
+{
+	if (EquippedWeapon)
+	{
+		EquippedWeapon->SetVisibility(false);
+	}
+
+	EquippedWeapon = nullptr;
+	bIsWeaponEquipped = false;
+	bIsAttacking = false;
+}
+
 void UPXCombatComponent::WeaponAttack()
 {
 	if (EquippedWeapon == nullptr)
@@ -174,6 +194,72 @@ EWeaponType UPXCombatComponent::GetWeaponType()
 		return EWeaponType::EWT_MAX;
 
 	return EquippedWeapon->GetWeaponType();
+}
+
+bool UPXCombatComponent::CanAttack() const
+{
+	const UWorld* World = GetWorld();
+	if (!World)
+		return false;
+
+	return World->GetTimeSeconds() - LastAttackTime >= GetAttackCooldown();
+}
+
+void UPXCombatComponent::MarkAttackUsed()
+{
+	if (const UWorld* World = GetWorld())
+	{
+		LastAttackTime = World->GetTimeSeconds();
+	}
+}
+
+float UPXCombatComponent::GetAttackCooldown() const
+{
+	return 1.0f / FMath::Max(0.1f, AttackSpeed);
+}
+
+void UPXCombatComponent::ApplyStatModifier(EPXPlayerStatType StatType, float AddValue, float MultiplyValue)
+{
+	const float SafeMultiplier = FMath::Max(0.0f, MultiplyValue);
+
+	switch (StatType)
+	{
+	case EPXPlayerStatType::MaxHealth:
+		MaxHP = FMath::Max(1.0f, (MaxHP + AddValue) * SafeMultiplier);
+		CurrentHP = FMath::Min(CurrentHP + AddValue, MaxHP);
+		UpdateHPBar();
+		break;
+	case EPXPlayerStatType::MoveSpeed:
+		MaxWalkSpeed = FMath::Max(0.0f, (MaxWalkSpeed + AddValue) * SafeMultiplier);
+		if (OwnerCharacter)
+		{
+			OwnerCharacter->GetCharacterMovement()->MaxWalkSpeed = MaxWalkSpeed;
+		}
+		break;
+	case EPXPlayerStatType::AttackSpeed:
+		AttackSpeed = FMath::Max(0.1f, (AttackSpeed + AddValue) * SafeMultiplier);
+		break;
+	case EPXPlayerStatType::AttackRange:
+		MeleeTraceDistance = FMath::Max(0.0f, (MeleeTraceDistance + AddValue) * SafeMultiplier);
+		MeleeTraceRadius = FMath::Max(0.0f, (MeleeTraceRadius + AddValue) * SafeMultiplier);
+		break;
+	case EPXPlayerStatType::MaxStamina:
+		MaxStamina = FMath::Max(1.0f, (MaxStamina + AddValue) * SafeMultiplier);
+		CurrentStamina = FMath::Min(CurrentStamina + AddValue, MaxStamina);
+		UpdateStaminaBar();
+		break;
+	case EPXPlayerStatType::AttackDamage:
+		MeleeDamage = FMath::Max(0.0f, (MeleeDamage + AddValue) * SafeMultiplier);
+		break;
+	case EPXPlayerStatType::HealthRegen:
+		HealthRecoveryAmount = FMath::Max(0.0f, (HealthRecoveryAmount + AddValue) * SafeMultiplier);
+		break;
+	case EPXPlayerStatType::StaminaRegen:
+		StaminaRecoveryAmount = FMath::Max(0.0f, (StaminaRecoveryAmount + AddValue) * SafeMultiplier);
+		break;
+	default:
+		break;
+	}
 }
 
 void UPXCombatComponent::SetIsAttacking(bool InbIsAttacking)
@@ -233,12 +319,49 @@ float UPXCombatComponent::TakeDamage(float Damage, FDamageEvent const& DamageEve
 
 		if (OwnerCharacter->GetMesh())
 		{
-			// enable partial ragdoll physics, but keep the pelvis vertical
-			OwnerCharacter->GetMesh()->SetPhysicsBlendWeight(0.5f);
+			// Brief physics blend gives a hit reaction without leaving the player stuck in physics.
+			OwnerCharacter->GetMesh()->SetPhysicsBlendWeight(HitReactionPhysicsBlendWeight);
 			OwnerCharacter->GetMesh()->SetBodySimulatePhysics(OwnerCharacter->PelvisBoneName, false);
+		}
+
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(HitReactionPhysicsTimer);
+			World->GetTimerManager().SetTimer(HitReactionPhysicsTimer, this, &UPXCombatComponent::ResetHitReactionPhysics, HitReactionPhysicsDuration, false);
 		}
 	}
 	return Damage;
+}
+
+void UPXCombatComponent::ResetHitReactionPhysics()
+{
+	if (OwnerCharacter && OwnerCharacter->GetMesh() && CurrentHP > 0.0f)
+	{
+		OwnerCharacter->GetMesh()->SetPhysicsBlendWeight(0.0f);
+		OwnerCharacter->GetMesh()->SetSimulatePhysics(false);
+		RestoreOwnerMovementIfNeeded();
+	}
+}
+
+void UPXCombatComponent::RestoreOwnerMovementIfNeeded()
+{
+	if (!OwnerCharacter || CurrentHP <= 0.0f)
+	{
+		return;
+	}
+
+	UCharacterMovementComponent* MovementComponent = OwnerCharacter->GetCharacterMovement();
+	if (!MovementComponent)
+	{
+		return;
+	}
+
+	if (MovementComponent->MovementMode == MOVE_None)
+	{
+		MovementComponent->SetMovementMode(MOVE_Walking);
+	}
+
+	MovementComponent->MaxWalkSpeed = MaxWalkSpeed;
 }
 
 void UPXCombatComponent::Landed(const FHitResult& Hit)
@@ -246,10 +369,10 @@ void UPXCombatComponent::Landed(const FHitResult& Hit)
 	if (nullptr == OwnerCharacter)
 		return;
 
-	if (CurrentHP >= 0.0f)
+	if (CurrentHP > 0.0f)
 	{
-		// disable ragdoll physics
-		OwnerCharacter->GetMesh()->SetPhysicsBlendWeight(0.0f);
+		ResetHitReactionPhysics();
+		RestoreOwnerMovementIfNeeded();
 	}
 }
 

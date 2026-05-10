@@ -21,13 +21,23 @@ void UPXPlayerAnimInstance::NativeUpdateAnimation(float DeltaTime)
 	APawn* OwnerPawn = TryGetPawnOwner();
 	if (!OwnerPawn) return;
 
+	if (ACharacter* OwnerCharacter = Cast<ACharacter>(OwnerPawn))
+	{
+		if (UCharacterMovementComponent* CharacterMovement = OwnerCharacter->GetCharacterMovement())
+		{
+			MaxWalkSpeed = CharacterMovement->MaxWalkSpeed;
+			const float GroundSpeed = CharacterMovement->Velocity.Size2D();
+			bIsRunning = GroundSpeed > MaxWalkSpeed * 0.65f;
+		}
+	}
+
 	if (!TXCharacter || TXCharacter != OwnerPawn)
 	{
 		TXCharacter = Cast<ACombatCharacter>(OwnerPawn);
 		if (!TXCharacter) return;
 	}
 
-	// 최종 보장된 상태에서만 호출
+	// 플레이어는 입력 상태를 기준으로 달리기 애니메이션을 결정한다.
 	bIsRunning = TXCharacter->IsRunning();
 	bIsAttacking  = TXCharacter->IsAttacking();
 }

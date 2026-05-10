@@ -34,6 +34,38 @@ enum class EAugmentTarget : uint8
 };
 
 UENUM(BlueprintType)
+enum class EPXAugmentRarity : uint8
+{
+	Common,
+	Rare,
+	Epic,
+	Legendary
+};
+
+UENUM(BlueprintType)
+enum class EPXPlayerStatType : uint8
+{
+	MaxHealth,
+	MoveSpeed,
+	AttackSpeed,
+	AttackRange,
+	MaxStamina,
+	AttackDamage,
+	HealthRegen,
+	StaminaRegen
+};
+
+UENUM(BlueprintType)
+enum class EPXEnemyType : uint8
+{
+	Normal,
+	Fast,
+	Tank,
+	Ranged,
+	Boss
+};
+
+UENUM(BlueprintType)
 enum class EAttackType : uint8
 {
 	Projectile,

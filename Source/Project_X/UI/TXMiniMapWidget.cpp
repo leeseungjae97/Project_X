@@ -10,6 +10,8 @@
 #include "UI/TXEnemyMarkerWidget.h"
 #include "Components/Image.h"
 #include "Components/CanvasPanel.h"
+#include "Components/Overlay.h"
+#include "Blueprint/WidgetTree.h"
 #include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMaterialLibrary.h"
@@ -42,6 +44,72 @@ void UTXMiniMapWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 
 void UTXMiniMapWidget::AddMapPoint_Implementation(AActor* Actor)
 {
+	UOverlay* MapPointsOverlay = FindMapPointsOverlay();
+	if (!Actor || !MapPointsOverlay)
+	{
+		return;
+	}
+
+	TSubclassOf<UTXEnemyMarkerWidget> WidgetClass = MarkerWidgetClass;
+	if (!WidgetClass)
+	{
+		WidgetClass = UTXEnemyMarkerWidget::StaticClass();
+	}
+	UTXEnemyMarkerWidget* MarkerWidget = CreateWidget<UTXEnemyMarkerWidget>(GetOwningPlayer(), WidgetClass);
+	if (!MarkerWidget)
+	{
+		return;
+	}
+
+	const FString ActorClassName = Actor->GetClass() ? Actor->GetClass()->GetName() : FString();
+	const bool bBoss = ActorClassName.Contains(TEXT("Boss"));
+	const bool bRanged = ActorClassName.Contains(TEXT("Range")) || ActorClassName.Contains(TEXT("Ranged"));
+
+	MarkerWidget->SetMarkerActor(Actor);
+	if (bBoss)
+	{
+		MarkerWidget->SetMarkerStyle(FLinearColor(1.0f, 0.05f, 0.05f, 1.0f), 1.6f);
+	}
+	else if (bRanged)
+	{
+		MarkerWidget->SetMarkerStyle(FLinearColor(0.65f, 0.25f, 1.0f, 1.0f), 1.15f);
+	}
+	else
+	{
+		MarkerWidget->SetMarkerStyle(FLinearColor(1.0f, 0.25f, 0.1f, 1.0f), 1.0f);
+	}
+
+	MapPointsOverlay->AddChild(MarkerWidget);
+}
+
+void UTXMiniMapWidget::RemoveMapPoint_Implementation(AActor* Actor)
+{
+	UOverlay* MapPointsOverlay = FindMapPointsOverlay();
+	if (!Actor || !MapPointsOverlay)
+	{
+		return;
+	}
+
+	for (int32 ChildIndex = MapPointsOverlay->GetChildrenCount() - 1; ChildIndex >= 0; --ChildIndex)
+	{
+		UWidget* ChildWidget = MapPointsOverlay->GetChildAt(ChildIndex);
+		if (!ChildWidget)
+		{
+			continue;
+		}
+
+		FObjectPropertyBase* ActorProperty = FindFProperty<FObjectPropertyBase>(ChildWidget->GetClass(), TEXT("Actor"));
+		if (!ActorProperty)
+		{
+			continue;
+		}
+
+		UObject* ReferencedObject = ActorProperty->GetObjectPropertyValue_InContainer(ChildWidget);
+		if (ReferencedObject == Actor)
+		{
+			MapPointsOverlay->RemoveChildAt(ChildIndex);
+		}
+	}
 }
 
 void UTXMiniMapWidget::SetMiniMapImage()
@@ -95,19 +163,32 @@ void UTXMiniMapWidget::SetPanelRotate()
 	if (!GetOwningPlayerPawn())
 		return;
 
-	GetOwningPlayerPawn();
-	ACharacter* Character = UGameplayStatics::GetPlayerCharacter(this, 0);
 
-	if (!Character)
+	// ACharacter* Character = UGameplayStatics::GetPlayerCharacter(this, 0);
+	APawn* Pawn = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!IsValid(Pawn))
 		return;
 
-	FVector Loc = Character->GetActorLocation();
-	FRotator Rot = Character->GetActorRotation();
+	FVector Loc = Pawn->GetActorLocation();
 
 	UKismetMaterialLibrary::SetScalarParameterValue(this, MPC_MiniMap, TEXT("X"), Loc.X);
 	UKismetMaterialLibrary::SetScalarParameterValue(this, MPC_MiniMap, TEXT("Y"), Loc.Y);
+}
 
-	Rot.Yaw *= -1.0;
+UOverlay* UTXMiniMapWidget::FindMapPointsOverlay() const
+{
+	// 디버깅 메세지 출력
 
-	MiniMapCanvas->SetRenderTransformAngle(Rot.Yaw);
+
+	if (!WidgetTree)
+	{
+		return nullptr;
+	}
+
+	if (UOverlay* Overlay = WidgetTree->FindWidget<UOverlay>(TEXT("MapPoints")))
+	{
+		return Overlay;
+	}
+
+	return WidgetTree->FindWidget<UOverlay>(TEXT("Map Points"));
 }

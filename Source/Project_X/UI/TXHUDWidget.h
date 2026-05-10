@@ -8,6 +8,8 @@
 
 class UProgressBar;
 class UImage;
+class UTextBlock;
+class UWidget;
 /**
  * 
  */
@@ -24,6 +26,24 @@ class PROJECT_X_API UTXHUDWidget : public UUserWidget
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (AllowPrivateAccess = "true", BindWidget))
 	UProgressBar* PB_StaminaBar;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (AllowPrivateAccess = "true", BindWidgetOptional))
+	UTextBlock* Text_Round;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (AllowPrivateAccess = "true", BindWidgetOptional))
+	UTextBlock* Text_RemainingEnemies;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (AllowPrivateAccess = "true", BindWidgetOptional))
+	UTextBlock* Text_Result;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (AllowPrivateAccess = "true", BindWidgetOptional))
+	UWidget* BossHealthRoot;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (AllowPrivateAccess = "true", BindWidgetOptional))
+	UProgressBar* PB_BossHPBar;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, meta = (AllowPrivateAccess = "true", BindWidgetOptional))
+	UTextBlock* Text_BossName;
 
 	UPROPERTY()
 	UMaterialInstanceDynamic* MID_HpBar = nullptr;
@@ -55,9 +75,14 @@ private:
 	void UpdateHpBar(float DeltaTime);
 	void UpdateStaminaBar(float DeltaTime);
 	void UpdateXPBar(float DeltaTime);
+	void CreateFallbackBossHealthUI();
 	
 public:
 	void SetHP(float HPPercent);
 	void SetStamina(float StaminaPercent);
 	void SetXPRing(float XPRingPercent);
+	void SetRoundInfo(int32 RoundIndex, int32 RemainingEnemies);
+	void SetResultText(const FText& ResultText);
+	void SetBossHealthVisible(bool bVisible);
+	void SetBossHealth(float HealthPercent, const FText& BossName);
 };

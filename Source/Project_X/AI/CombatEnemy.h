@@ -6,6 +6,7 @@
 #include "GameFramework/Character.h"
 #include "Animation/AnimMontage.h"
 #include "Engine/TimerHandle.h"
+#include "Core/EnumTypes.h"
 #include "Interfaces/PXLockOnTargetInterface.h"
 #include "CombatAttacker.h"
 #include "Damageable.h"
@@ -15,6 +16,8 @@ class UWidgetComponent;
 class UPXMapPointComponent;
 class UPXCombatLifeBar;
 class UAnimMontage;
+class UMaterialInterface;
+class APXEnemyProjectile;
 
 /** Completed attack animation delegate for StateTree */
 DECLARE_DELEGATE(FOnEnemyAttackCompleted);
@@ -24,6 +27,30 @@ DECLARE_DELEGATE(FOnEnemyLanded);
 
 /** Enemy died delegate */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnEnemyDied);
+
+USTRUCT(BlueprintType)
+struct FPXEnemyStats
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy")
+	EPXEnemyType Type = EPXEnemyType::Normal;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy", meta = (ClampMin = 1))
+	float MaxHealth = 3.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy", meta = (ClampMin = 0))
+	float MoveSpeed = 480.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy", meta = (ClampMin = 0))
+	float AttackDamage = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy", meta = (ClampMin = 0))
+	float AttackRange = 75.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy", meta = (ClampMin = 0))
+	float AttackRadius = 50.0f;
+};
 
 /**
  *  An AI-controlled character with combat capabilities.
@@ -46,11 +73,34 @@ public:
 	/** Constructor */
 	ACombatEnemy();
 
+	virtual void Tick(float DeltaSeconds) override;
+
 protected:
 
 	/** Max amount of HP the character will have on respawn */
 	UPROPERTY(EditAnywhere, Category="Damage")
 	float MaxHP = 3.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy", meta = (AllowPrivateAccess = "true"))
+	FPXEnemyStats EnemyStats;
+
+	UPROPERTY(EditAnywhere, Category = "Enemy|Visual", meta = (AllowPrivateAccess = "true"))
+	bool bApplyTypeColor = true;
+
+	UPROPERTY(EditAnywhere, Category = "Enemy|Visual", meta = (AllowPrivateAccess = "true"))
+	UMaterialInterface* EnemyTypeMaterial;
+
+	UPROPERTY(EditAnywhere, Category = "Enemy|Ranged", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<APXEnemyProjectile> ProjectileClass;
+
+	UPROPERTY(EditAnywhere, Category = "Enemy|Ranged", meta = (ClampMin = 0, AllowPrivateAccess = "true"))
+	float RangedAttackDistance = 900.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Enemy|Ranged", meta = (ClampMin = 0, AllowPrivateAccess = "true"))
+	float ProjectileSpawnForwardOffset = 80.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Enemy|Ranged", meta = (ClampMin = 0, AllowPrivateAccess = "true"))
+	float ProjectileSpawnUpOffset = 65.0f;
 
 public:
 
@@ -141,6 +191,29 @@ protected:
 	/** Attack montage ended delegate */
 	FOnMontageEnded OnAttackMontageEnded;
 
+	UPROPERTY(EditAnywhere, Category = "AI|Prototype")
+	bool bEnablePrototypeChaseFallback = true;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Prototype", meta = (ClampMin = 0.05))
+	float ChaseUpdateInterval = 0.25f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Prototype", meta = (ClampMin = 0))
+	float AttackAcceptancePadding = 25.0f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Prototype", meta = (ClampMin = 0.1))
+	float PrototypeAttackCooldown = 1.0f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Prototype", meta = (ClampMin = 0, ClampMax = 1))
+	float PrototypeAttackDamageTime = 0.78f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Prototype")
+	FName PrototypeAttackDamageBone = TEXT("hand_r");
+
+	float ChaseUpdateElapsed = 0.0f;
+	float LastPrototypeAttackTime = -1000.0f;
+	bool bDamageAppliedThisAttack = false;
+	FTimerHandle PrototypeAttackDamageTimer;
+
 public:
 	/** Attack completed internal delegate to notify StateTree tasks */
 	FOnEnemyAttackCompleted OnAttackCompleted;
@@ -195,6 +268,18 @@ public:
 
 protected:
 
+	void ApplyEnemyStats();
+	void ApplyEnemyTypeVisuals();
+	void UpdatePrototypeChase(float DeltaSeconds);
+	void TryPrototypeAttack(ACharacter* TargetCharacter);
+	void ApplyPrototypeAttackDamage();
+	void FireProjectileAtTarget(ACharacter* TargetCharacter);
+	ACharacter* GetTargetPlayerCharacter() const;
+	EPXEnemyType GetEffectiveEnemyType() const;
+	FLinearColor GetEnemyTypeColor() const;
+	bool IsRangedEnemy() const;
+	float GetPrototypeAttackDistance() const;
+
 	/** Removes this character from the level after it dies */
 	void RemoveFromLevel();
 
@@ -222,6 +307,12 @@ protected:
 
 public:
 	void LifeBarExposure(bool bExpose);
+
+	UFUNCTION(BlueprintPure, Category = "Enemy")
+	float GetHealthPercent() const;
+
+	UFUNCTION(BlueprintPure, Category = "Enemy")
+	bool IsBossEnemy() const;
 
 public:
 	// ~begin IPXLockOnTargetInterface

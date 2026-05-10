@@ -662,3 +662,12 @@ FodyWeavers.xsd
 # Additional files built by Visual Studio
 
 # End of https://www.toptal.com/developers/gitignore/api/c++,windows,unrealengine,visualstudio,rider
+
+# Local repository notes
+README_LOCAL.md
+GAME_PLAN_LOCAL.md
+WAVE_SURVIVAL_PROTOTYPE_LOCAL.md
+AGENTS.md
+
+# Local Unreal plugin workspace
+Plugins/

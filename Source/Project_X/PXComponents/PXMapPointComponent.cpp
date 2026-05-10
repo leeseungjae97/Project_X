@@ -16,6 +16,12 @@ void UPXMapPointComponent::BeginPlay()
 	Super::BeginPlay();
 }
 
+void UPXMapPointComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	RemoveMapPoint();
+	Super::EndPlay(EndPlayReason);
+}
+
 void UPXMapPointComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -39,4 +45,22 @@ void UPXMapPointComponent::CreateMapPoint()
 			}
 		}
 	}
+}
+
+void UPXMapPointComponent::RemoveMapPoint()
+{
+	if (!bIsMapPointCreated || !OwnerCharacter || !GetWorld())
+	{
+		return;
+	}
+
+	if (ATXPlayerController* PC = Cast<ATXPlayerController>(GetWorld()->GetFirstPlayerController()))
+	{
+		if (UTXMiniMapWidget* Widget = PC->GetMiniMapWidget())
+		{
+			Widget->RemoveMapPoint(OwnerCharacter);
+		}
+	}
+
+	bIsMapPointCreated = false;
 }

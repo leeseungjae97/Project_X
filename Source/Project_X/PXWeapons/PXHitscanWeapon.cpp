@@ -32,6 +32,11 @@ void APXHitscanWeapon::Fire()
 
 		AController* InstigatorController = OwnerPawn->GetController();
 		IDamageable* Damageable = Cast<IDamageable>(FireHit.GetActor());
+		if (Damageable)
+		{
+			const FVector Impulse = (GetActorForwardVector() * KnockbackImpulse) + (FVector::UpVector * LaunchImpulse);
+			Damageable->ApplyDamage(Damage, this, FireHit.ImpactPoint, Impulse);
+		}
 
 		UWorld* World = GetWorld();
 		if (World)
@@ -144,11 +149,27 @@ void APXHitscanWeapon::TraceHitTarget(FHitResult& HitResult)
 		FVector Start = SocketTransform.GetLocation();
 		FVector End = Start + CrosshairWorldDirection * 3000.f;
 
-		GetWorld()->LineTraceSingleByChannel(
+		FCollisionObjectQueryParams ObjectParams;
+		ObjectParams.AddObjectTypesToQuery(ECC_Pawn);
+		ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+		ObjectParams.AddObjectTypesToQuery(ECC_WorldStatic);
+
+		FCollisionQueryParams QueryParams;
+		QueryParams.AddIgnoredActor(GetOwnerCharacter());
+		QueryParams.AddIgnoredActor(this);
+
+		GetWorld()->LineTraceSingleByObjectType(
 			HitResult,
 			Start,
 			End,
-			ECollisionChannel::ECC_Visibility
+			ObjectParams,
+			QueryParams
 		);
+
+		if (!HitResult.bBlockingHit)
+		{
+			HitResult.ImpactPoint = End;
+			HitResult.Location = End;
+		}
 	}
 }

@@ -7,6 +7,7 @@
 #include "TXAugmentCardWidget.generated.h"
 
 struct FPXAugmentData;
+struct FPXStatAugmentData;
 class UTextBlock;
 class UButton;
 class UImage;
@@ -22,11 +23,14 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SetupFromData(const FPXAugmentData& InData);
 
-	UPROPERTY(meta=(BindWidget)) UTextBlock* Text_Name;
-	UPROPERTY(meta=(BindWidget)) UTextBlock* Text_Desc;
-	UPROPERTY(meta=(BindWidget)) UImage*     Img_Icon;
-	UPROPERTY(meta=(BindWidget)) UImage*     Img_Frame;
-	UPROPERTY(meta=(BindWidget)) UButton*    Btn_Select;
+	UFUNCTION(BlueprintCallable)
+	void SetupFromStatData(const FPXStatAugmentData& InData);
+
+	UPROPERTY(meta=(BindWidgetOptional)) UTextBlock* Text_Name;
+	UPROPERTY(meta=(BindWidgetOptional)) UTextBlock* Text_Desc;
+	UPROPERTY(meta=(BindWidgetOptional)) UImage*     Img_Icon;
+	UPROPERTY(meta=(BindWidgetOptional)) UImage*     Img_Frame;
+	UPROPERTY(meta=(BindWidgetOptional)) UButton*    Btn_Select;
 
 	// 선택 시 브로드캐스트
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FAugmentSelected, FName, AugmentID);

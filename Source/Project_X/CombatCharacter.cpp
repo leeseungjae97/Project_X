@@ -22,6 +22,7 @@
 #include "PXAnimation/PXPlayerAnimInstance.h"
 #include "UI/TXLockOnWidget.h"
 #include "CombatGameMode.h"
+#include "GameMode/PXWaveSurvivalGameMode.h"
 #include "PXWeapons/PXWeapon.h"
 #include "PXWeapons/PXMeleeWeapon.h"
 #include "PXWeapons/PXHitscanWeapon.h"
@@ -75,7 +76,7 @@ ACombatCharacter::ACombatCharacter()
 void ACombatCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
+	
 	// 로컬 플레이어는 보간하지 않음 (안전한 방식)
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
@@ -301,7 +302,12 @@ void ACombatCharacter::Use1ActionPressed()
 	if (nullptr == TXCombatComponent)
 		return;
 
-	SpawnWeapon(HitscanWeaponClass);
+	TSubclassOf<APXWeapon> WeaponClass = HitscanWeaponClass;
+	if (!WeaponClass)
+	{
+		WeaponClass = APXHitscanWeapon::StaticClass();
+	}
+	SpawnWeapon(WeaponClass);
 }
 
 void ACombatCharacter::Use2ActionPressed()
@@ -309,7 +315,12 @@ void ACombatCharacter::Use2ActionPressed()
 	if (nullptr == TXCombatComponent)
 		return;
 
-	SpawnWeapon(MeleeWeaponClass);
+	TSubclassOf<APXWeapon> WeaponClass = MeleeWeaponClass;
+	if (!WeaponClass)
+	{
+		WeaponClass = APXMeleeWeapon::StaticClass();
+	}
+	SpawnWeapon(WeaponClass);
 }
 
 void ACombatCharacter::Use3ActionPressed()
@@ -317,6 +328,7 @@ void ACombatCharacter::Use3ActionPressed()
 	if (nullptr == TXCombatComponent)
 		return;
 
+	UnequipWeapon();
 }
 
 void ACombatCharacter::Use4ActionPressed()
@@ -461,6 +473,10 @@ void ACombatCharacter::ComboAttack()
 	if (nullptr == TXCombatComponent || nullptr == TXPlayerAnimInstance)
 		return;
 
+	if (!TXCombatComponent->CanAttack())
+		return;
+
+	TXCombatComponent->MarkAttackUsed();
 	TXCombatComponent->SetIsAttacking(true);
 
 	TXPlayerAnimInstance->ComboAttack(OnAttackMontageEnded, ComboAttackMontage);
@@ -470,6 +486,11 @@ void ACombatCharacter::ChargedAttack()
 {
 	if (nullptr == TXCombatComponent || nullptr == TXPlayerAnimInstance)
 		return;
+
+	if (!TXCombatComponent->CanAttack())
+		return;
+
+	TXCombatComponent->MarkAttackUsed();
 	TXCombatComponent->SetIsAttacking(true);
 
 	TXPlayerAnimInstance->ChargedAttack(OnAttackMontageEnded, ChargedAttackMontage);
@@ -479,7 +500,15 @@ void ACombatCharacter::AttackMontageEnded(UAnimMontage* Montage, bool bInterrupt
 {
 	if (nullptr == TXCombatComponent || nullptr == TXPlayerAnimInstance)
 		return;
+
+	GetWorldTimerManager().ClearTimer(WeaponDamageFallbackTimer);
 	TXCombatComponent->SetIsAttacking(false);
+	bWeaponDamageAppliedThisAttack = false;
+
+	if (TXCombatComponent->GetCurrentHP() > 0.0f && GetCharacterMovement() && GetCharacterMovement()->MovementMode == MOVE_None)
+	{
+		GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	}
 
 	// check if we have a non-stale cached input
 	if (TXPlayerAnimInstance->GetNonStaleCachedInput())
@@ -525,17 +554,33 @@ void ACombatCharacter::WeaponAttack()
 	if (nullptr == TXCombatComponent || nullptr == TXPlayerAnimInstance)
 		return;
 
-	// TXCombatComponent->SetIsAttacking(true);
+	if (!TXCombatComponent->CanAttack())
+		return;
+
+	TXCombatComponent->MarkAttackUsed();
+	bWeaponDamageAppliedThisAttack = false;
+	TXCombatComponent->SetIsAttacking(true);
 
 	TXCombatComponent->WeaponAttack();
 
 	PlayWeaponMontage();
+
+	if (TXCombatComponent->GetWeaponType() != EWeaponType::EWT_Melee)
+	{
+		GetWorldTimerManager().SetTimer(WeaponDamageFallbackTimer, this, &ACombatCharacter::ApplyWeaponAttackDamageFallback, 0.12f, false);
+	}
 }
 
 void ACombatCharacter::FireWeapon()
 {
+	if (bWeaponDamageAppliedThisAttack)
+	{
+		return;
+	}
+
 	if (TXCombatComponent && TXCombatComponent->IsWeaponEquipped())
 	{
+		bWeaponDamageAppliedThisAttack = true;
 		TXCombatComponent->Fire();
 	}
 }
@@ -560,9 +605,19 @@ void ACombatCharacter::DoAttackTrace(FName DamageSourceBone)
 	if (nullptr == TXCombatComponent)
 		return;
 
-	if (TXCombatComponent->IsWeaponEquipped())
+	const bool bUsingMeleeWeapon = TXCombatComponent->IsWeaponEquipped() && TXCombatComponent->GetWeaponType() == EWeaponType::EWT_Melee;
+	if (TXCombatComponent->IsWeaponEquipped() && !bUsingMeleeWeapon)
 	{
 		return;
+	}
+
+	if (bUsingMeleeWeapon && bWeaponDamageAppliedThisAttack)
+	{
+		return;
+	}
+	if (bUsingMeleeWeapon)
+	{
+		bWeaponDamageAppliedThisAttack = true;
 	}
 	
 	float MeleeTraceDistance = TXCombatComponent->GetMeleeTraceDistance();
@@ -615,6 +670,21 @@ void ACombatCharacter::DoAttackTrace(FName DamageSourceBone)
 	}
 }
 
+void ACombatCharacter::ApplyWeaponAttackDamageFallback()
+{
+	if (!TXCombatComponent || !TXCombatComponent->IsWeaponEquipped() || bWeaponDamageAppliedThisAttack)
+	{
+		return;
+	}
+
+	if (TXCombatComponent->GetWeaponType() == EWeaponType::EWT_Melee)
+	{
+		return;
+	}
+
+	FireWeapon();
+}
+
 void ACombatCharacter::CheckCombo()
 {
 	if (nullptr == GetMesh())
@@ -649,6 +719,11 @@ void ACombatCharacter::ApplyDamage(float Damage, AActor* DamageCauser, const FVe
 
 void ACombatCharacter::HandleDeath()
 {
+	if (APXWaveSurvivalGameMode* WaveGameMode = GetWorld()->GetAuthGameMode<APXWaveSurvivalGameMode>())
+	{
+		WaveGameMode->HandlePlayerDied();
+	}
+
 	// disable movement while we're dead
 	GetCharacterMovement()->DisableMovement();
 
@@ -667,7 +742,14 @@ void ACombatCharacter::HandleDeath()
 
 void ACombatCharacter::ApplyHealing(float Healing, AActor* Healer)
 {
-	// stub
+	if (!TXCombatComponent || Healing <= 0.0f)
+	{
+		return;
+	}
+
+	const float NewHP = FMath::Min(TXCombatComponent->GetMaxHP(), TXCombatComponent->GetCurrentHP() + Healing);
+	TXCombatComponent->SetCurrentHP(NewHP);
+	TXCombatComponent->UpdateHPBar();
 }
 
 void ACombatCharacter::RespawnCharacter()
@@ -740,6 +822,7 @@ void ACombatCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	// clear the respawn timer
 	GetWorld()->GetTimerManager().ClearTimer(RespawnTimer);
+	GetWorld()->GetTimerManager().ClearTimer(WeaponDamageFallbackTimer);
 }
 
 void ACombatCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -846,6 +929,11 @@ void ACombatCharacter::SetIsAttacking(bool bIsAttack)
 		return;
 	
 	TXCombatComponent->SetIsAttacking(bIsAttack);
+
+	if (bIsAttack && TXCombatComponent->IsWeaponEquipped() && TXCombatComponent->GetWeaponType() == EWeaponType::EWT_Melee)
+	{
+		DoAttackTrace(TEXT("hand_r"));
+	}
 }
 
 void ACombatCharacter::SpawnWeapon(TSubclassOf<APXWeapon> SpawnWeaponClass)
@@ -853,28 +941,61 @@ void ACombatCharacter::SpawnWeapon(TSubclassOf<APXWeapon> SpawnWeaponClass)
 	UWorld* World = GetWorld();
 	if (World && SpawnWeaponClass)
 	{
-		if (EquippedWeapon)
+		const EWeaponType CurrentWeaponType = TXCombatComponent ? TXCombatComponent->GetWeaponType() : EWeaponType::EWT_MAX;
+		const APXWeapon* ClassDefaultWeapon = SpawnWeaponClass->GetDefaultObject<APXWeapon>();
+		if (EquippedWeapon && ClassDefaultWeapon && CurrentWeaponType == ClassDefaultWeapon->GetWeaponType())
 		{
-			EquippedWeapon->Destroy();
-			EquippedWeapon = nullptr;
+			return;
 		}
+
+		UnequipWeapon();
 		
-		EquippedWeapon = World->SpawnActor<APXWeapon>(SpawnWeaponClass);
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.Owner = this;
+		SpawnParameters.Instigator = this;
+		EquippedWeapon = World->SpawnActor<APXWeapon>(SpawnWeaponClass, SpawnParameters);
+		if (!EquippedWeapon)
+			return;
+
 		if (UPXCollisionComponent* cc = EquippedWeapon->CollisionComponent)
 		{
 			// TXCombatComponent->WeaponAttackStart.AddUFunction(EquippedWeapon, FName("WeaponAttackStart"));
 			TXCombatComponent->WeaponAttackStart.AddUObject(EquippedWeapon, &APXWeapon::AttackStart);
 		}
 
-		TXCombatComponent->WeaponEquipped;
-		
-		if (!EquippedWeapon)
-			return;
-		
 		EquippedWeapon->SetOwnerCharacter(this);
 
 		if (TXCombatComponent)
+		{
 			TXCombatComponent->EquipWeapon(EquippedWeapon);
+			TXCombatComponent->WeaponEquipped.Broadcast();
+		}
 	}	
 }
 
+void ACombatCharacter::UnequipWeapon()
+{
+	GetWorldTimerManager().ClearTimer(WeaponDamageFallbackTimer);
+	bWeaponDamageAppliedThisAttack = false;
+
+	if (EquippedWeapon)
+	{
+		if (TXCombatComponent)
+		{
+			TXCombatComponent->WeaponAttackStart.RemoveAll(EquippedWeapon);
+		}
+
+		EquippedWeapon->Destroy();
+		EquippedWeapon = nullptr;
+	}
+
+	if (TXCombatComponent)
+	{
+		TXCombatComponent->UnequipWeapon();
+	}
+}
+
+UAbilitySystemComponent* ACombatCharacter::GetAbilitySystemComponent() const
+{
+	return nullptr;
+}
